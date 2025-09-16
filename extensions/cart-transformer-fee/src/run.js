@@ -1,45 +1,38 @@
 // @ts-check
-
-/*
-A straightforward example of a function that updates a line item title and price for VIP customers.
-
-The function reads the cart and checks if the customer is a VIP. For VIP customers,
-each line item will be updated with a custom title and a discounted price of $50 off
-the original price.
-*/
-
 /**
  * @typedef {import("../generated/api").Input} Input
  * @typedef {import("../generated/api").FunctionRunResult} FunctionRunResult
  * @typedef {import("../generated/api").CartOperation} CartOperation
  */
 
-/**
- * @type {FunctionRunResult}
- */
-const NO_CHANGES = {
-  operations: [],
-};
+/** @type {FunctionRunResult} */
+const NO_CHANGES = { operations: [] };
 
 /**
  * @param {Input} input
  * @returns {FunctionRunResult}
  */
 export function run(input) {
-  // const isVipCustomer = input.cart.buyerIdentity?.customer?.hasAnyTag ?? false;
-  //
-  // if (!isVipCustomer) {
-  //   return NO_CHANGES;
-  // }
+  console.log('🟢 Cart-transform function start');
+  console.log('📦 Full cart input (partial):', JSON.stringify(input.cart, null, 2));
 
-  const operations = input.cart.lines.reduce(
-    /** @param {CartOperation[]} acc */
-    (acc, cartLine) => {
-      const updateOperation = buildVipUpdateOperation(cartLine);
-      return [...acc, { update: updateOperation }];
-    },
-    []
-  );
+  // ATTENZIONE: cart.attribute è un SINGOLO oggetto Attribute o null
+  console.log('📌 cart.attribute:', input.cart.attribute);
+
+  const creditCardSelected =
+    input.cart.attribute?.key === 'creditCard' &&
+    input.cart.attribute?.value === 'yes';
+
+  console.log('🎯 creditCardSelected:', creditCardSelected);
+
+  if (!creditCardSelected) {
+    console.log('⛔ No credit card surcharge applied');
+    return NO_CHANGES;
+  }
+
+  console.log('✅ Applying 6% surcharge to all lines');
+
+  const operations = input.cart.lines.map((line) => buildUpdateOperation(line));
 
   return operations.length > 0 ? { operations } : NO_CHANGES;
 }
@@ -47,16 +40,18 @@ export function run(input) {
 /**
  * @param {Input['cart']['lines'][number]} cartLine
  */
-function buildVipUpdateOperation(
-  { id: cartLineId, cost }
-) {
+function buildUpdateOperation({ id: cartLineId, cost }) {
+  const originalAmount = parseFloat(cost.amountPerQuantity.amount);
+  const updatedAmount = (originalAmount * 1.06).toFixed(2);
+
+  console.log(`💰 Updating line ${cartLineId}: ${originalAmount} -> ${updatedAmount}`);
+
   return {
-    cartLineId,
-    title: "Commissione Paypal2",
-    price: {
-      adjustment: {
-        fixedPricePerUnit: {
-          amount: cost.amountPerQuantity.amount *2,
+    update: {
+      cartLineId,
+      price: {
+        adjustment: {
+          fixedPricePerUnit: { amount: updatedAmount },
         },
       },
     },

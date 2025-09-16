@@ -1,96 +1,109 @@
-import {
-  extension,
-  Text,
-} from '@shopify/ui-extensions/checkout';
+import { extension, Text, Checkbox } from '@shopify/ui-extensions/checkout';
 
-// 1. Choose an extension target
-export default extension(
-  'purchase.checkout.reductions.render-after',
-  (root, api) => {
-    // console.log('Extension loaded successfully');
+export default extension('purchase.checkout.reductions.render-after', (root, api) => {
+  let currentMessage = null;
+  let creditCardFlag = null;
 
-    let currentMessage = null;
-    let isPayPalSelected = false;
+  let lastCreditCardSelected = null;
+  let lastAppliedAttribute = null;
+  let applyTimer = null;
+  const DEBOUNCE_MS = 300;
 
-    // Funzione per aggiornare il messaggio
-    function updateMessage() {
-      // console.log('Updating message, PayPal selected:', isPayPalSelected);
-
-      const messageText = isPayPalSelected
-        ? 'Sovrapprezzo PayPal applicato: +3%'
-        : 'Se utilizzi PayPal come metodo di pagamento, verrà applicato un sovrapprezzo del 3%.';
-
-      if (currentMessage) {
-        root.removeChild(currentMessage);
-        // console.log('Removed existing message');
-      }
-
-      // 2. Render a UI
+  function createMessageAndCheckbox() {
+    if (!currentMessage) {
       currentMessage = root.createComponent(
         Text,
-        {
-          size: 'small',
-          appearance: isPayPalSelected ? 'critical' : 'subdued'
-        },
-        messageText
+        { size: 'medium', appearance: 'critical' },
+        'If you pay with a credit card, a 6% fee will be applied.'
       );
-
       root.appendChild(currentMessage);
-      // console.log('New message rendered:', messageText);
     }
 
-    // Renderizza il messaggio iniziale
-    updateMessage();
+    if (!creditCardFlag) {
+      creditCardFlag = root.createComponent(
+        Checkbox,
+        { id: 'credit-card-flag', value: true, disabled: true },
+        'Credit card surcharge applied'
+      );
+      root.appendChild(creditCardFlag);
+    }
+  }
 
-    if (api.selectedPaymentOptions) {
-      // console.log('SelectedPaymentOptions API available');
+  function removeUI() {
+    if (currentMessage) {
+      try { root.removeChild(currentMessage); } catch (e) { }
+      currentMessage = null;
+    }
+    if (creditCardFlag) {
+      try { root.removeChild(creditCardFlag); } catch (e) { }
+      creditCardFlag = null;
+    }
+  }
 
-      api.selectedPaymentOptions.subscribe((selectedPaymentOptions) => {
-        // console.log('Payment options changed:', selectedPaymentOptions);
+  function scheduleApplyAttribute(value) {
+    if (lastAppliedAttribute === value) {
+      console.log('⚡ scheduleApplyAttribute: already applied, skip', value);
+      return;
+    }
 
-        const hasPayPal = selectedPaymentOptions.some(option => {
-          // Controlla handle, type e name per PayPal
-          const isPayPal =
-            option.handle?.includes('paypal') ||
-            option.handle?.includes('wallet-paypal') ||
-            (option.type === 'wallet' && option.handle?.includes('paypal')) ||
-            option.name?.toLowerCase().includes('paypal') ||
-            option.type === 'paypal';
+    if (applyTimer) {
+      clearTimeout(applyTimer);
+      applyTimer = null;
+    }
 
-          // console.log('Checking payment option:', {
-          //   handle: option.handle,
-          //   type: option.type,
-          //   name: option.name
-          // }, 'Is PayPal:', isPayPal);
+    applyTimer = setTimeout(async () => {
+      applyTimer = null;
 
-          return isPayPal;
+      if (!api.applyAttributeChange) {
+        return;
+      }
+
+      try {
+        const res = await api.applyAttributeChange({
+          type: 'updateAttribute', // corretto type
+          key: 'creditCard',
+          value,
         });
 
-        // console.log('PayPal detected:', hasPayPal);
+        lastAppliedAttribute = value;
+      } catch (err) {
+        console.error('❌ Errore applyAttributeChange:', err);
+      }
+    }, DEBOUNCE_MS);
+  }
 
-        if (hasPayPal !== isPayPalSelected) {
-          isPayPalSelected = hasPayPal;
-          updateMessage();
-
-          // Applica l'attributo quando PayPal è selezionato
-          if (api.applyAttributeChange) {
-            api.applyAttributeChange({
-              key: 'paypal_surcharge_accepted',
-              type: 'updateAttribute',
-              value: isPayPalSelected ? 'yes' : 'no',
-            }).then(result => {
-              // console.log('Attribute change result:', result);
-            }).catch(error => {
-              // console.error('Error applying attribute change:', error);
-            });
-          }
-        }
-      });
-    } else {
-      // console.error('SelectedPaymentOptions API not available');
+  function updateUI(show) {
+    if (show === lastCreditCardSelected) {
+      return;
     }
 
-    // Debug: log delle API disponibili
-    // console.log('Available APIs:', Object.keys(api));
-  },
-);
+    lastCreditCardSelected = show;
+
+    if (show) {
+      createMessageAndCheckbox();
+      scheduleApplyAttribute('yes');
+    } else {
+      removeUI();
+      scheduleApplyAttribute('no');
+    }
+  }
+
+  lastCreditCardSelected = null;
+  updateUI(false);
+
+  api.selectedPaymentOptions?.subscribe((selectedPaymentOptions) => {
+    try {
+      const creditCardSelected = Array.isArray(selectedPaymentOptions)
+        ? selectedPaymentOptions.some(opt =>
+          opt?.type === 'creditCard' ||
+          (opt?.name && String(opt.name).toLowerCase().includes('amex'))
+        )
+        : false;
+
+      updateUI(creditCardSelected);
+    } catch (err) {
+      console.error('❌ errore nella subscription selectedPaymentOptions:', err);
+    }
+  });
+
+});
