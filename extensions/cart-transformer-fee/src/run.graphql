@@ -1,32 +1,17 @@
-query Input {
+query RunInput {
   cart {
+    attribute(key: "creditCard") {
+      key
+      value
+    }
     lines {
       id
       quantity
       cost {
         amountPerQuantity {
           amount
-        }
-        totalAmount {
-          amount
           currencyCode
         }
-      }
-      merchandise {
-        ... on ProductVariant {
-          product {
-            title
-          }
-        }
-        ... on CustomProduct {
-          title
-        }
-      }
-    }
-    buyerIdentity {
-      customer {
-        id
-        hasAnyTag(tags: ["VIP"])
       }
     }
   }

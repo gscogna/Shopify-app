@@ -1,13 +1,12 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "bb072ad391a0992708dd976e048ae86b"
-name = "commission-fee-paypal"
-handle = "commission-fee-paypal"
-application_url = "https://rare-spoken-treasure-locks.trycloudflare.com"
+name = "commission-fee-amex"
+handle = "commission-fee-amex"
+application_url = "https://tap-internship-males-ot.trycloudflare.com"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
 
 [webhooks]
@@ -19,9 +18,9 @@ scopes = "read_cart_transforms,read_checkouts,read_discounts,read_orders,read_pa
 
 [auth]
 redirect_urls = [
-  "https://rare-spoken-treasure-locks.trycloudflare.com/auth/callback",
-  "https://rare-spoken-treasure-locks.trycloudflare.com/auth/shopify/callback",
-  "https://rare-spoken-treasure-locks.trycloudflare.com/api/auth/callback"
+  "https://tap-internship-males-ot.trycloudflare.com/auth/callback",
+  "https://tap-internship-males-ot.trycloudflare.com/auth/shopify/callback",
+  "https://tap-internship-males-ot.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
